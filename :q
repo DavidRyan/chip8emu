@@ -1,0 +1,10 @@
+fn main() {
+    print!("Hello World");
+    let _user1 = User {
+    };
+}
+
+struct User {
+}
+
+
