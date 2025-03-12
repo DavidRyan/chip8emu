@@ -61,7 +61,7 @@ impl Chip8 {
                 0x10 => self.op_jump_addr(word1, word2),
                 0x60 => self.op_set_reg(word1, word2), 
                 0x70 => self.op_add(word1, word2),
-                0xA0 => self.op_set_i_reg(word1, word2),
+                0xA0 => self.op_set_i_reg(word2),
                 0xD0 => self.op_draw(),
                 _ =>  {},
             }
@@ -102,7 +102,7 @@ impl Chip8 {
         self.pc += 2; 
     }
 
-    fn op_set_i_reg(&mut self, word1: u8, word2: u8) {
+    fn op_set_i_reg(&mut self, word2: u8) {
         self.i = word2 as u16; 
         self.pc +=2
     }
