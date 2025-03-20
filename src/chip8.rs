@@ -26,8 +26,32 @@ pub struct Chip8 {
     graphics: [bool; 64 * 32],
     stack: Vec<u16>,
     sp: u16,
-    pc: u16
+    pc: u16,
+    instruction: Instruction
 }
+
+struct Instruction {
+    pub instruction: u8,
+    pub w2: u8,
+    pub w2: u8,
+    pub x: u8,
+    pub y: u8,
+    pub n: u8,
+    pub nn: u8,
+    pub nnn: u16,
+}
+
+impl Instruction {
+    fn init(&mut self, w1: u8, w2: u8) {
+        self.instruction = w1 & 0xf0;
+        self.x = w1 & 0x0f;
+        self.y = (w2 & 0xf0) >> 4;
+        self.n = w2 & 0x0f;
+        self.nn = w2;
+        self.nnn = (((w1 & 0x0f) as u16) << 8) | w2 as u16;
+    }
+}
+
 
 impl Chip8 {
     pub fn new() -> Chip8 {
@@ -44,24 +68,32 @@ impl Chip8 {
             registers: [0; 16],
             memory: mem,
             graphics: [false; 64 * 32],
-            stack: Vec::new()
+            stack: Vec::new(),
+            instruction: Instruction {
+                instruction: 0,
+                x: 0,
+                y: 0,
+                n: 0,
+                nn: 0,
+                nnn: 0
+            }
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn execute(&mut self) {
+
         while (self.sp as usize) < self.memory.len() {
-            let word1 = self.memory[self.pc as usize];
-            let word2 = self.memory[(self.pc + 1) as usize];
-            match word1 & 0xf0 {
-                0x00 => match word2 {
+            self.instruction.init(self.memory[self.pc as usize], self.memory[(self.pc + 1) as usize]);
+            match self.instruction.instruction {
+                0x00 => match self.instruction.w2 {
                     0xe0 => self.op_clear_screen(),
                     0xee => self.op_return(),
                     _ => println!("not found")
                 },
-                0x10 => self.op_jump_addr(word1, word2),
-                0x60 => self.op_set_reg(word1, word2), 
-                0x70 => self.op_add(word1, word2),
-                0xA0 => self.op_set_i_reg(word2),
+                0x10 => self.op_jump_addr(),
+                0x60 => self.op_set_reg(), 
+                0x70 => self.op_add(),
+                0xA0 => self.op_set_i_reg(),
                 0xD0 => self.op_draw(),
                 _ =>  {},
             }
@@ -92,7 +124,7 @@ impl Chip8 {
 
     fn op_set_reg(&mut self, word1: u8, word2: u8) {
         let register_index = word1 & 0x0f;
-        self.registers[register_index as usize] = word2; // TODO: this as useize might not work
+        self.registers[register_index as usize] = word2; 
         self.pc +=2
     }
 
