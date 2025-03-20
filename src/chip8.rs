@@ -1,20 +1,9 @@
 const SPRITE_CHARS: [u8; 80] = [
-    0xF0, 0x90, 0x90, 0x90, 0xF0, 
-    0x20, 0x60, 0x20, 0x20, 0x70, 
-    0xF0, 0x10, 0xF0, 0x80, 0xF0, 
-    0xF0, 0x10, 0xF0, 0x10, 0xF0, 
-    0x90, 0x90, 0xF0, 0x10, 0x10, 
-    0xF0, 0x80, 0xF0, 0x10, 0xF0, 
-    0xF0, 0x80, 0xF0, 0x90, 0xF0, 
-    0xF0, 0x10, 0x20, 0x40, 0x40, 
-    0xF0, 0x90, 0xF0, 0x90, 0xF0, 
-    0xF0, 0x90, 0xF0, 0x10, 0xF0, 
-    0xF0, 0x90, 0xF0, 0x90, 0x90, 
-    0xE0, 0x90, 0xE0, 0x90, 0xE0,
-    0xF0, 0x80, 0x80, 0x80, 0xF0,
-    0xE0, 0x90, 0x90, 0x90, 0xE0, 
-    0xF0, 0x80, 0xF0, 0x80, 0xF0,
-    0xF0, 0x80, 0xF0, 0x80, 0x80, 
+    0xF0, 0x90, 0x90, 0x90, 0xF0, 0x20, 0x60, 0x20, 0x20, 0x70, 0xF0, 0x10, 0xF0, 0x80, 0xF0, 0xF0,
+    0x10, 0xF0, 0x10, 0xF0, 0x90, 0x90, 0xF0, 0x10, 0x10, 0xF0, 0x80, 0xF0, 0x10, 0xF0, 0xF0, 0x80,
+    0xF0, 0x90, 0xF0, 0xF0, 0x10, 0x20, 0x40, 0x40, 0xF0, 0x90, 0xF0, 0x90, 0xF0, 0xF0, 0x90, 0xF0,
+    0x10, 0xF0, 0xF0, 0x90, 0xF0, 0x90, 0x90, 0xE0, 0x90, 0xE0, 0x90, 0xE0, 0xF0, 0x80, 0x80, 0x80,
+    0xF0, 0xE0, 0x90, 0x90, 0x90, 0xE0, 0xF0, 0x80, 0xF0, 0x80, 0xF0, 0xF0, 0x80, 0xF0, 0x80, 0x80,
 ];
 
 pub struct Chip8 {
@@ -27,12 +16,12 @@ pub struct Chip8 {
     stack: Vec<u16>,
     sp: u16,
     pc: u16,
-    instruction: Instruction
+    instruction: Instruction,
 }
 
 struct Instruction {
     pub instruction: u8,
-    pub w2: u8,
+    pub w1: u8,
     pub w2: u8,
     pub x: u8,
     pub y: u8,
@@ -42,21 +31,22 @@ struct Instruction {
 }
 
 impl Instruction {
-    fn init(&mut self, w1: u8, w2: u8) {
+    fn read(&mut self, w1: u8, w2: u8) {
         self.instruction = w1 & 0xf0;
         self.x = w1 & 0x0f;
         self.y = (w2 & 0xf0) >> 4;
         self.n = w2 & 0x0f;
         self.nn = w2;
         self.nnn = (((w1 & 0x0f) as u16) << 8) | w2 as u16;
+        self.w1 = w1;
+        self.w2 = w2
     }
 }
-
 
 impl Chip8 {
     pub fn new() -> Chip8 {
         let mut mem = [0_u8; 4096];
-        for(i, sprint) in SPRITE_CHARS.iter().enumerate() {
+        for (i, sprint) in SPRITE_CHARS.iter().enumerate() {
             mem[i] = *sprint
         }
         Chip8 {
@@ -75,27 +65,33 @@ impl Chip8 {
                 y: 0,
                 n: 0,
                 nn: 0,
-                nnn: 0
-            }
+                nnn: 0,
+                w1: 0,
+                w2: 0,
+            },
         }
     }
 
     pub fn execute(&mut self) {
-
-        while (self.sp as usize) < self.memory.len() {
-            self.instruction.init(self.memory[self.pc as usize], self.memory[(self.pc + 1) as usize]);
+        loop {
+            self.instruction.read(
+                self.memory[self.pc as usize],
+                self.memory[(self.pc + 1) as usize],
+            );
             match self.instruction.instruction {
                 0x00 => match self.instruction.w2 {
                     0xe0 => self.op_clear_screen(),
                     0xee => self.op_return(),
-                    _ => println!("not found")
+                    _ => println!("No instruction found for {:#x}", self.instruction.w1),
                 },
                 0x10 => self.op_jump_addr(),
-                0x60 => self.op_set_reg(), 
+                0x60 => self.op_set_reg(),
                 0x70 => self.op_add(),
                 0xA0 => self.op_set_i_reg(),
                 0xD0 => self.op_draw(),
-                _ =>  {},
+                _ => {
+                    println!("No instruction found for {:#x}", self.instruction.w1)
+                }
             }
         }
     }
@@ -108,44 +104,38 @@ impl Chip8 {
         for i in self.graphics.iter_mut() {
             *i = false;
         }
-        self.pc +=2
+        self.pc += 2
     }
 
     fn op_return(&mut self) {
         for i in self.graphics.iter_mut() {
             *i = false;
         }
-        self.pc +=2
+        self.pc += 2
     }
 
-    fn op_jump_addr(&mut self, word1: u8, word2: u8) {
-        self.pc = (((word1 & 0x0f) as u16) << 8u16) | word2 as u16;
+    fn op_jump_addr(&mut self) {
+        self.pc = (((self.instruction.w1 & 0x0f) as u16) << 8u16) | self.instruction.w2 as u16;
     }
 
-    fn op_set_reg(&mut self, word1: u8, word2: u8) {
-        let register_index = word1 & 0x0f;
-        self.registers[register_index as usize] = word2; 
-        self.pc +=2
+    fn op_set_reg(&mut self) {
+        let register_index = self.instruction.w1 & 0x0f;
+        self.registers[register_index as usize] = self.instruction.w2;
+        self.pc += 2
     }
 
-     fn op_add(&mut self, word1: u8, word2: u8) {
-        let register_index = (word1 & 0x0f) as usize;
-        let _ = self.registers[register_index].overflowing_add(word2); // TODO: Handle overflow?
-        self.pc += 2; 
+    fn op_add(&mut self) {
+        let register_index = (self.instruction.w1 & 0x0f) as usize;
+        let _ = self.registers[register_index].overflowing_add(self.instruction.w2); // TODO: Handle overflow?
+        self.pc += 2;
     }
 
-    fn op_set_i_reg(&mut self, word2: u8) {
-        self.i = word2 as u16; 
-        self.pc +=2
+    fn op_set_i_reg(&mut self) {
+        self.i = self.instruction.w2 as u16;
+        self.pc += 2
     }
 
     fn op_draw(&mut self) {
-        self.pc +=2;
+        self.pc += 2;
     }
 }
-
-
-
-
-
-
