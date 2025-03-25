@@ -1,4 +1,3 @@
-use std::usize;
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 const SPRITE_CHARS: [u8; 80] = [
@@ -9,14 +8,6 @@ const SPRITE_CHARS: [u8; 80] = [
     0xF0, 0xE0, 0x90, 0x90, 0x90, 0xE0, 0xF0, 0x80, 0xF0, 0x80, 0xF0, 0xF0, 0x80, 0xF0, 0x80, 0x80,
 ];
 
-fn lo_nib(b: u8) -> u8 {
-    b & 0x0f
-}
-macro_rules! nnn {
-    ($w0:expr, $w1:expr) => {
-        (($w0 & 0x0f) as u16) << 8 | $w1 as u16
-    };
-}
 
 pub struct Chip8 {
     delay_timer: u8,
