@@ -9,11 +9,9 @@ const SPRITE_CHARS: [u8; 80] = [
     0xF0, 0xE0, 0x90, 0x90, 0x90, 0xE0, 0xF0, 0x80, 0xF0, 0x80, 0xF0, 0xF0, 0x80, 0xF0, 0x80, 0x80,
 ];
 
-
-
-    fn lo_nib(b: u8) -> u8 {
-        b & 0x0f
-    }
+fn lo_nib(b: u8) -> u8 {
+    b & 0x0f
+}
 macro_rules! nnn {
     ($w0:expr, $w1:expr) => {
         (($w0 & 0x0f) as u16) << 8 | $w1 as u16
@@ -49,7 +47,7 @@ impl Instruction {
     fn read(&mut self, w1: u8, w2: u8) {
         println!("w1: {:#x}, w2: {:#X}", w1, w2);
         println!("Inst: {:#x}", ((w1 as u16) << 8) | (w2 as u16));
-        self.opcode =((w1 as u16) << 8) | (w2 as u16);
+        self.opcode = ((w1 as u16) << 8) | (w2 as u16);
         self.instruction = w1 & 0xf0;
         self.x = w1 & 0x0f;
         self.y = (w2 & 0xf0) >> 4;
@@ -113,7 +111,7 @@ impl Chip8 {
 
     pub fn load_rom(&mut self, rom: &[u8]) {
         println!("Load Rom");
-        
+
         self.memory[0x200..(0x200 as usize) + rom.len()].copy_from_slice(rom);
     }
 
@@ -139,7 +137,10 @@ impl Chip8 {
     }
 
     fn op_set_reg(&mut self) {
-        println!("Set Reg {:#x} as {:#x}", self.instruction.x, self.instruction.nn);
+        println!(
+            "Set Reg {:#x} as {:#x}",
+            self.instruction.x, self.instruction.nn
+        );
         self.registers[self.instruction.x as usize] = self.instruction.nn;
         self.pc += 2
     }
@@ -147,7 +148,8 @@ impl Chip8 {
     // wasn't adding this correctly due to overflow'
     fn op_add(&mut self) {
         println!("Add");
-        let (res, overflow) = self.registers[self.instruction.x as usize].overflowing_add(self.instruction.w2);
+        let (res, overflow) =
+            self.registers[self.instruction.x as usize].overflowing_add(self.instruction.w2);
         if overflow {
             // do something
         }
@@ -189,6 +191,6 @@ impl Chip8 {
         } else {
             self.registers[0xF] = 0;
         }
-        self.pc +=2;
+        self.pc += 2;
     }
 }

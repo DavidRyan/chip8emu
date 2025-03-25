@@ -23,31 +23,28 @@ struct Container {
 static CHIP8: LazyLock<Mutex<Chip8>> = LazyLock::new(|| Mutex::new(Chip8::new()));
 
 fn main() {
-        let args: Vec<String> = env::args().collect();
-        let file_path = &args[1];
+    let args: Vec<String> = env::args().collect();
+    let file_path = &args[1];
 
-        println!("File path {}", file_path);
+    println!("File path {}", file_path);
 
+    let args: Vec<String> = env::args().collect();
+    let file_path = &args[1];
 
-        let args: Vec<String> = env::args().collect();
-        let file_path = &args[1];
+    let rom = fs::read(file_path).unwrap();
+    CHIP8.lock().unwrap().load_rom(&rom);
 
-        let rom = fs::read(file_path).unwrap();
-        CHIP8.lock().unwrap().load_rom(&rom);
-
-        let win_config = WindowConfig::new().set_size(1200, 640).set_vsync(true);
-        let _ = notan::init()
-            .draw(draw)
-            .update(update)
-            .add_config(DrawConfig)
-            .add_config(win_config)
-            .event(event)
-            .build();
-
-    }
+    let win_config = WindowConfig::new().set_size(1200, 640).set_vsync(true);
+    let _ = notan::init()
+        .draw(draw)
+        .update(update)
+        .add_config(DrawConfig)
+        .add_config(win_config)
+        .event(event)
+        .build();
+}
 
 fn setup(gfx: &mut Graphics) -> State {
-
     State {
         graphics: [false; 64 * 32],
     }
@@ -59,7 +56,7 @@ fn update(app: &mut App) {
 }
 
 fn event(app: &mut App, evt: Event) {
-    if let Event::KeyUp{ .. } = evt {
+    if let Event::KeyUp { .. } = evt {
         println!("Key down {:?}", app.keyboard.last_key_released);
     }
 }
@@ -92,5 +89,4 @@ fn draw(gfx: &mut Graphics) {
     let now = time::Instant::now();
 
     thread::sleep(ten_millis);
-
 }
