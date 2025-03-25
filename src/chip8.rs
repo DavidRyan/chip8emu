@@ -25,7 +25,7 @@ pub struct Chip8 {
     registers: [u8; 16],
     memory: [u8; 4096],
     pub graphics: [bool; 64 * 32],
-    stack: Vec<u16>,
+    stack: [u16; 8],
     sp: u16,
     pc: u16,
     instruction: Instruction,
@@ -72,7 +72,7 @@ impl Chip8 {
             registers: [0; 16],
             memory: mem,
             graphics: [false; 64 * 32],
-            stack: Vec::new(),
+            stack: [0; 8],
             instruction: Instruction {
                 instruction: 0,
                 opcode: 0,
@@ -99,8 +99,92 @@ impl Chip8 {
                 _ => println!("No instruction found for {:#x}", self.instruction.w1),
             },
             0x10 => self.op_jump_addr(),
+            0x20 => {
+                self.stack[self.sp as usize] = self.pc;
+                self.sp += 1;
+                self.pc = self.instruction.nnn;
+            }
+            0x30 => self.skip_if_reg_eq(),
+            0x40 => self.skip_if_reg_neq(),
+            0x50 => self.skip_if_reg_v_x_eq(),
             0x60 => self.op_set_reg(),
             0x70 => self.op_add(),
+            0x80 => match self.instruction.n {
+                0x0000 => {
+                    self.registers[self.instruction.x as usize] = self.registers[self.instruction.y as usize];
+                    self.pc += 2;   
+                }
+                0x0001 => {
+                    self.registers[self.instruction.x as usize] |= self.registers[self.instruction.y as usize];
+                    self.pc += 2;   
+                }
+                0x0002 => {
+                    self.registers[self.instruction.x as usize] &= self.registers[self.instruction.y as usize];
+                    self.pc += 2;   
+                }
+                0x0003 => {
+                    self.registers[self.instruction.x as usize] ^= self.registers[self.instruction.y as usize];
+                    self.pc += 2;   
+                }
+                0x0004 => {
+                    let (res, overflow) = self.registers[self.instruction.x as usize].overflowing_add(self.registers[self.instruction.y as usize]);
+                    self.registers[self.instruction.x as usize] = res;
+                    if overflow {
+                        self.registers[15] = 1;
+                    } else {
+                        self.registers[15] = 0;
+                    }
+
+                    let x = self.registers[self.instruction.x as usize] as u16;
+                    let y = self.registers[self.instruction.y as usize] as u16;
+                    if x + y > 255 {
+                       // self.registers[15] = 1;
+                    } else {
+                        //self.registers[15] = 0;
+                    }
+                    self.pc += 2;   
+                }
+                0x0005 => {
+                    let (res, overflow) = self.registers[self.instruction.x as usize].overflowing_sub(self.registers[self.instruction.y as usize]);
+                    if overflow {
+                        self.registers[15] = 1;
+                    } else {
+                        self.registers[15] = 0;
+                    }
+                    self.registers[self.instruction.x as usize] = res;
+                    self.pc += 2;   
+                }
+                0x0006 => {
+                    self.registers[15] = self.registers[self.instruction.x as usize] & 0x1;
+                    self.registers[self.instruction.x as usize] >>= 1;
+                    self.pc += 2;   
+                }
+                0x0007 => {
+                    let (res, overflow) = self.registers[self.instruction.y as usize].overflowing_sub(self.registers[self.instruction.x as usize]);
+                    if overflow {
+                        self.registers[15] = 0;
+                    } else {
+                        self.registers[15] = 1;
+                    }
+                    self.registers[self.instruction.x as usize] = res;
+                    self.pc += 2;   
+                }
+                0x000e => {
+                    self.registers[15] = self.registers[self.instruction.x as usize] >> 7;
+                    self.registers[self.instruction.x as usize] <<= 1;
+                    self.pc += 2;
+                }
+                _ => {
+                    println!()
+                }
+            }
+            0x90 => {
+                if self.registers[self.instruction.y as usize] != self.registers[self.instruction.x as usize] {
+                    self.pc += 4;   
+                } else {
+                    self.pc += 2;   
+                }
+            }
             0xA0 => self.op_set_i_reg(),
             0xD0 => self.op_draw(),
             _ => {
@@ -115,6 +199,30 @@ impl Chip8 {
         self.memory[0x200..(0x200 as usize) + rom.len()].copy_from_slice(rom);
     }
 
+    fn skip_if_reg_v_x_eq(&mut self) {
+        if self.registers[self.instruction.y as usize] == self.registers[self.instruction.x as usize] {
+            self.pc += 4;   
+        } else {
+            self.pc += 2;   
+        }
+    }
+
+    fn skip_if_reg_neq(&mut self) {
+        if self.registers[self.instruction.x as usize] == self.instruction.nn {
+            self.pc += 2;   
+        } else {
+            self.pc += 4;   
+        }
+    }
+
+    fn skip_if_reg_eq(&mut self) {
+        if self.registers[self.instruction.x as usize] == self.instruction.nn {
+            self.pc += 4;   
+        } else {
+            self.pc += 2;   
+        }
+    }
+
     fn op_clear_screen(&mut self) {
         println!("Clear Screen");
         for i in self.graphics.iter_mut() {
@@ -124,10 +232,8 @@ impl Chip8 {
     }
 
     fn op_return(&mut self) {
-        println!("Return");
-        for i in self.graphics.iter_mut() {
-            *i = false;
-        }
+        self.sp -= 1;
+        self.pc = self.stack[self.sp as usize];
         self.pc += 2
     }
 
