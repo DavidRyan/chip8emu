@@ -144,47 +144,41 @@ impl Chip8 {
         self.pc += 2
     }
 
+    // wasn't adding this correctly due to overflow'
     fn op_add(&mut self) {
         println!("Add");
-        let register_index = (self.instruction.w1 & 0x0f) as usize;
-        let _ = self.registers[register_index].overflowing_add(self.instruction.w2); // TODO: Handle overflow?
+        let (res, overflow) = self.registers[self.instruction.x as usize].overflowing_add(self.instruction.w2);
+        if overflow {
+            // do something
+        }
+        self.registers[self.instruction.x as usize] = res;
         self.pc += 2;
     }
 
     fn op_set_i_reg(&mut self) {
         println!("Set I Reg to {:#x}", self.instruction.nnn);
-        self.i = self.instruction.opcode & 0xFFF;//nnn!(self.instruction.w1, self.instruction.w2);
+        self.i = self.instruction.nnn;
         println!("IIII: {:#x}", self.i);
         self.pc += 2
     }
-
-    // Sprite is found correctly, with the locations provided, x/y coords seem to be incorrect when
-    // drawwing
     fn op_draw(&mut self) {
-        //println!("Draw");
-        let x_coord = self.registers[((self.instruction.opcode & 0x0F00) >> 8) as usize];
-        let y_coord = self.registers[((self.instruction.opcode & 0x00F0) >> 4) as usize];
-        //let x_coord = self.registers[self.instruction.x as usize];
-        //let y_coord = self.registers[self.instruction.y as usize];
-        //println!("COORDINATES X: {:#} Y: {:#}", x_coord, y_coord);
-        //self.registers[15] = 0;
+        println!("Draw");
+
+        self.registers[15] = 0;
+
+        let x_coord = self.registers[self.instruction.x as usize];
+        let y_coord = self.registers[self.instruction.y as usize];
         let mut flipped = false;
-        let lines =  self.instruction.opcode & 0x000F;
-        //println!("I as usign: {:#x} ", (self.i) as usize);
-        //println!("LINES: {}", lines);
+
         for y_line in 0..self.instruction.n {
-            // get ith byte of data from I from memory (sprinte)
-            //println!("Drawing sprite at index {}", self.i + y_line as u16);
             let sprite = self.memory[(self.i + y_line as u16) as usize];
-            //println!("I: {:#x} Sprite: {:#x}", self.i + y_line as u16, sprite);
-            //println!("sprite {:#x}", self.i + y_line as u16);
+            println!("I: {:#x} Sprite: {:#x}", self.i + y_line as u16, sprite);
             for x_line in 0..8 {
                 let bit_on = sprite & (0b1000_0000 >> x_line);
                 if bit_on != 0 {
-                    // This is probable the issue
                     let x = (x_coord + x_line) as usize % SCREEN_WIDTH;
                     let y = (y_coord + y_line) as usize % SCREEN_HEIGHT;
-                    let idx = y * 64 + x;
+                    let idx = y * SCREEN_WIDTH + x;
                     flipped |= self.graphics[idx];
                     self.graphics[idx] ^= true;
                 }
