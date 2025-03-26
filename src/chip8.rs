@@ -167,12 +167,12 @@ impl Chip8 {
                     }
                     0x001E => {
                         let (res, overflow) = self.i.overflowing_add(self.reg[self.inst.x as usize] as u16);
+                        self.i = res;
                         if overflow {
                             self.reg[15] = 1;
                         } else {
                             self.reg[15] = 0;
                         }
-                        self.i = res;
                         self.pc += 2;
                     }
                     0x029 => {
@@ -181,38 +181,26 @@ impl Chip8 {
                     }
                     // below all wrong
                     0x0033 => {
-                        let vx = self.reg[self.inst.x as usize] as f32;
+                        let x = ((self.inst.opcode & 0x0F00) >> 8) as usize;
+                        let vx = self.reg[x];
 
-                        let hundreds = (vx / 100.0).floor() as u8;
-                        let tens = ((vx / 10.0) % 10.0).floor() as u8;
-                        let ones = (vx % 10.0) as u8;
-
-                        self.memory[self.i as usize] = hundreds;
-                        self.memory[(self.i+ 1) as usize] = tens;
-                        self.memory[(self.i+ 2) as usize] = ones;
+                        self.memory[self.i as usize] = vx / 100;
+                        self.memory[(self.i + 1) as usize] = (vx % 100) / 10;
+                        self.memory[(self.i + 2) as usize] = vx % 10;
                         self.pc += 2;
                     }
                     0x0055 => {
-                        let x = self.inst.x as usize;
-                        println!("x: {:#x}", x);
-                        //let i = self.i as usize;
-                        //println!("i: {:#x}", i);
-                        for idx in 0..=x {
-                            //println!("idx: {:#x}", idx);
-                            //self.memory[i + idx] = self.reg[idx];
+                        let x = self.inst.x;
+                        for index in 0..=x as usize {
+                            self.memory[self.i as usize + index] = self.reg[index];
                         }
-                        for i in 0..x + 1 {
-                            self.memory[(self.i as usize) + i] = self.reg[i]; 
-                        }
-                        self.pc += 2;
-                        //panic!("Not implemented");
+                        self.pc += 2;        
                     }
                     0x0065 => {
-
-                        let vx = self.inst.x as usize;
-                        for i in 0..=vx {
+                        let x = self.inst.x;
+                        for i in 0..=x as usize {
+                            self.reg[i] = self.memory[(self.i as usize) + i];
                         }
-                        //self.i = self.i + self.inst.x as u16 + 1;
                         self.pc += 2;
                     }
                     _ => {
@@ -264,44 +252,41 @@ impl Chip8 {
                 self.pc += 2;   
             }
             0x0004 => {
-                let (res, overflow) = self.reg[self.inst.x as usize].overflowing_add(self.reg[self.inst.y as usize]);
-                self.reg[self.inst.x as usize] = res;
-                if overflow {
-                    self.reg[15] = 1;
-                } else {
-                    self.reg[15] = 0;
-                }
-                self.pc += 2;   
-            }
+                let x = ((self.inst.opcode & 0x0F00) >> 8) as usize;
+                let y = ((self.inst.opcode & 0x00F0) >> 4) as usize;
+                let (sum, carry) = self.reg[x].overflowing_add(self.reg[y]);
+                self.reg[x] = sum;
+                self.reg[0xF] = if carry { 1 } else { 0 };
+                self.pc += 2;}
             0x0005 => {
-                let (res, overflow) = self.reg[self.inst.x as usize].overflowing_sub(self.reg[self.inst.y as usize]);
-                if overflow {
-                    self.reg[15] = 1;
-                } else {
-                    self.reg[15] = 0;
-                }
-                self.reg[self.inst.x as usize] = res;
-                self.pc += 2;   
-            }
+                let x = ((self.inst.opcode & 0x0F00) >> 8) as usize;
+                let y = ((self.inst.opcode & 0x00F0) >> 4) as usize;
+                let (result, borrow) = self.reg[x].overflowing_sub(self.reg[y]);
+                self.reg[x] = result;
+                self.reg[0xF] = if borrow { 0 } else { 1 };
+                self.pc += 2;            }
             0x0006 => {
-                self.reg[15] = self.reg[self.inst.x as usize] & 0x1;
-                self.reg[self.inst.x as usize] >>= 1;
+                let x = self.inst.x as usize;
+                self.reg[0xf] = self.reg[x] & 0x01;
+                self.reg[x] >>= 1;
                 self.pc += 2;   
             }
             0x0007 => {
                 let (res, overflow) = self.reg[self.inst.y as usize].overflowing_sub(self.reg[self.inst.x as usize]);
+                self.reg[self.inst.x as usize] = res;
                 if overflow {
                     self.reg[15] = 0;
                 } else {
                     self.reg[15] = 1;
                 }
-                self.reg[self.inst.x as usize] = res;
                 self.pc += 2;   
             }
             0x000e => {
-                self.reg[15] = self.reg[self.inst.x as usize] >> 7;
-                self.reg[self.inst.x as usize] <<= 1;
+                let x = self.inst.x as usize;
+                self.reg[0xF] = (self.reg[x] & 0x80) >> 7;
+                self.reg[x] <<= 1;
                 self.pc += 2;
+
             }
             _ => {
                 println!()
