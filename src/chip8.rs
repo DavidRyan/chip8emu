@@ -1,3 +1,5 @@
+use rand::Rng;
+
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 const SPRITE_CHARS: [u8; 80] = [
@@ -13,17 +15,18 @@ pub struct Chip8 {
     delay_timer: u8,
     sound_timer: u8,
     i: u16,
-    registers: [u8; 16],
+    reg: [u8; 16],
     memory: [u8; 4096],
     pub graphics: [bool; 64 * 32],
     stack: [u16; 8],
     sp: u16,
     pc: u16,
-    instruction: Instruction,
+    inst: Instruction,
+    keys: [bool; 16],
 }
 
 struct Instruction {
-    pub instruction: u8,
+    pub inst: u8,
     pub opcode: u16,
     pub w1: u8,
     pub w2: u8,
@@ -36,10 +39,8 @@ struct Instruction {
 
 impl Instruction {
     fn read(&mut self, w1: u8, w2: u8) {
-        println!("w1: {:#x}, w2: {:#X}", w1, w2);
-        println!("Inst: {:#x}", ((w1 as u16) << 8) | (w2 as u16));
         self.opcode = ((w1 as u16) << 8) | (w2 as u16);
-        self.instruction = w1 & 0xf0;
+        self.inst = w1 & 0xf0;
         self.x = w1 & 0x0f;
         self.y = (w2 & 0xf0) >> 4;
         self.n = w2 & 0x0f;
@@ -60,12 +61,12 @@ impl Chip8 {
             delay_timer: 0,
             sound_timer: 8,
             i: 0,
-            registers: [0; 16],
+            reg: [0; 16],
             memory: mem,
             graphics: [false; 64 * 32],
             stack: [0; 8],
-            instruction: Instruction {
-                instruction: 0,
+            inst: Instruction {
+                inst: 0,
                 opcode: 0,
                 x: 0,
                 y: 0,
@@ -75,123 +76,242 @@ impl Chip8 {
                 w1: 0,
                 w2: 0,
             },
+            keys: [false; 16],
         }
     }
 
     pub fn execute(&mut self) {
-        self.instruction.read(
+        self.inst.read(
             self.memory[self.pc as usize],
             self.memory[(self.pc + 1) as usize],
         );
-        match self.instruction.instruction {
-            0x00 => match self.instruction.w2 {
+        match self.inst.inst{
+            0x00 => match self.inst.w2 {
                 0xe0 => self.op_clear_screen(),
                 0xee => self.op_return(),
-                _ => println!("No instruction found for {:#x}", self.instruction.w1),
+                _ => println!("No inst found for {:#x}", self.inst.w1),
             },
             0x10 => self.op_jump_addr(),
             0x20 => {
                 self.stack[self.sp as usize] = self.pc;
                 self.sp += 1;
-                self.pc = self.instruction.nnn;
+                self.pc = self.inst.nnn;
             }
             0x30 => self.skip_if_reg_eq(),
             0x40 => self.skip_if_reg_neq(),
             0x50 => self.skip_if_reg_v_x_eq(),
             0x60 => self.op_set_reg(),
             0x70 => self.op_add(),
-            0x80 => match self.instruction.n {
-                0x0000 => {
-                    self.registers[self.instruction.x as usize] = self.registers[self.instruction.y as usize];
-                    self.pc += 2;   
-                }
-                0x0001 => {
-                    self.registers[self.instruction.x as usize] |= self.registers[self.instruction.y as usize];
-                    self.pc += 2;   
-                }
-                0x0002 => {
-                    self.registers[self.instruction.x as usize] &= self.registers[self.instruction.y as usize];
-                    self.pc += 2;   
-                }
-                0x0003 => {
-                    self.registers[self.instruction.x as usize] ^= self.registers[self.instruction.y as usize];
-                    self.pc += 2;   
-                }
-                0x0004 => {
-                    let (res, overflow) = self.registers[self.instruction.x as usize].overflowing_add(self.registers[self.instruction.y as usize]);
-                    self.registers[self.instruction.x as usize] = res;
-                    if overflow {
-                        self.registers[15] = 1;
-                    } else {
-                        self.registers[15] = 0;
-                    }
-
-                    let x = self.registers[self.instruction.x as usize] as u16;
-                    let y = self.registers[self.instruction.y as usize] as u16;
-                    if x + y > 255 {
-                       // self.registers[15] = 1;
-                    } else {
-                        //self.registers[15] = 0;
-                    }
-                    self.pc += 2;   
-                }
-                0x0005 => {
-                    let (res, overflow) = self.registers[self.instruction.x as usize].overflowing_sub(self.registers[self.instruction.y as usize]);
-                    if overflow {
-                        self.registers[15] = 1;
-                    } else {
-                        self.registers[15] = 0;
-                    }
-                    self.registers[self.instruction.x as usize] = res;
-                    self.pc += 2;   
-                }
-                0x0006 => {
-                    self.registers[15] = self.registers[self.instruction.x as usize] & 0x1;
-                    self.registers[self.instruction.x as usize] >>= 1;
-                    self.pc += 2;   
-                }
-                0x0007 => {
-                    let (res, overflow) = self.registers[self.instruction.y as usize].overflowing_sub(self.registers[self.instruction.x as usize]);
-                    if overflow {
-                        self.registers[15] = 0;
-                    } else {
-                        self.registers[15] = 1;
-                    }
-                    self.registers[self.instruction.x as usize] = res;
-                    self.pc += 2;   
-                }
-                0x000e => {
-                    self.registers[15] = self.registers[self.instruction.x as usize] >> 7;
-                    self.registers[self.instruction.x as usize] <<= 1;
-                    self.pc += 2;
-                }
-                _ => {
-                    println!()
-                }
-            }
+            0x80 => self.bitwise_operations(),
             0x90 => {
-                if self.registers[self.instruction.y as usize] != self.registers[self.instruction.x as usize] {
+                if self.reg[self.inst.y as usize] != self.reg[self.inst.x as usize] {
                     self.pc += 4;   
                 } else {
                     self.pc += 2;   
                 }
             }
             0xA0 => self.op_set_i_reg(),
+            0xB0 => {
+                self.pc = self.inst.nnn + self.reg[0] as u16;
+            },
+            0xC0 => {
+                self.reg[self.inst.x as usize] = rand::rng().random_range(0..255) & self.inst.nn;
+            }
+            0xE0 => {
+                match self.inst.w2 { //TODO: this could be wrong
+                    0x90 => {
+                        if self.keys[self.reg[self.inst.x as usize] as usize] {
+                            self.pc += 4;
+                        } else {
+                            self.pc += 2;
+                        }
+                    },
+                    0xA1 => {
+                        if !self.keys[self.reg[self.inst.x as usize] as usize] {
+                            self.pc += 4;
+                        } else {
+                            self.pc += 2;
+                        }
+                    },
+                    _ => {
+                        println!("No inst found for {:#x}", self.inst.w1)
+                    }
+                }
+            }
+            0xF0 => {
+                match self.inst.w2 {
+                    0x07 => {
+                        self.reg[self.inst.x as usize] = self.delay_timer;
+                        self.pc += 2;
+                    },
+                    0x0A => {
+                        let mut key_pressed = false;
+                        for i in 0..16 {
+                            if self.keys[i] {
+                                self.reg[self.inst.x as usize] = i as u8;
+                                key_pressed = true;
+                            }
+                        }
+                        if !key_pressed {
+                            return;
+                        }
+                        self.pc += 2;
+                    },
+                    0x0015 => {
+                        self.delay_timer = self.reg[self.inst.x as usize];
+                        self.pc += 2;
+                    }
+                    0x0018 => {
+                        self.sound_timer = self.reg[self.inst.x as usize];
+                        self.pc += 2;
+                    }
+                    0x001E => {
+                        let (res, overflow) = self.i.overflowing_add(self.reg[self.inst.x as usize] as u16);
+                        if overflow {
+                            self.reg[15] = 1;
+                        } else {
+                            self.reg[15] = 0;
+                        }
+                        self.i = res;
+                        self.pc += 2;
+                    }
+                    0x029 => {
+                        self.i = self.reg[self.inst.x as usize] as u16 * 5;
+                        self.pc += 2;
+                    }
+                    // below all wrong
+                    0x0033 => {
+                        let vx = self.reg[self.inst.x as usize] as f32;
+
+                        let hundreds = (vx / 100.0).floor() as u8;
+                        let tens = ((vx / 10.0) % 10.0).floor() as u8;
+                        let ones = (vx % 10.0) as u8;
+
+                        self.memory[self.i as usize] = hundreds;
+                        self.memory[(self.i+ 1) as usize] = tens;
+                        self.memory[(self.i+ 2) as usize] = ones;
+                        self.pc += 2;
+                    }
+                    0x0055 => {
+                        let x = self.inst.x as usize;
+                        println!("x: {:#x}", x);
+                        //let i = self.i as usize;
+                        //println!("i: {:#x}", i);
+                        for idx in 0..=x {
+                            //println!("idx: {:#x}", idx);
+                            //self.memory[i + idx] = self.reg[idx];
+                        }
+                        for i in 0..x + 1 {
+                            self.memory[(self.i as usize) + i] = self.reg[i]; 
+                        }
+                        self.pc += 2;
+                        //panic!("Not implemented");
+                    }
+                    0x0065 => {
+
+                        let vx = self.inst.x as usize;
+                        for i in 0..=vx {
+                        }
+                        //self.i = self.i + self.inst.x as u16 + 1;
+                        self.pc += 2;
+                    }
+                    _ => {
+                        println!("No inst found for {:#x}", self.inst.w1)
+                    }
+                }
+            }
             0xD0 => self.op_draw(),
             _ => {
-                println!("No instruction found for {:#x}", self.instruction.w1)
+                println!("No inst found for {:#x}", self.inst.w1)
             }
         }
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+
+        if self.sound_timer > 0 {
+
+            if self.sound_timer == 1 {
+                // TODO: Implement sound
+            }
+            self.sound_timer -= 1;
+        }
     }
+
 
     pub fn load_rom(&mut self, rom: &[u8]) {
         println!("Load Rom");
 
-        self.memory[0x200..(0x200 as usize) + rom.len()].copy_from_slice(rom);
+        self.memory[0x200..(0x200_usize) + rom.len()].copy_from_slice(rom);
+    }
+
+    fn bitwise_operations(&mut self) {
+        match self.inst.n {
+            0x0000 => {
+                self.reg[self.inst.x as usize] = self.reg[self.inst.y as usize];
+                self.pc += 2;   
+            }
+            0x0001 => {
+                self.reg[self.inst.x as usize] |= self.reg[self.inst.y as usize];
+                self.pc += 2;   
+            }
+            0x0002 => {
+                self.reg[self.inst.x as usize] &= self.reg[self.inst.y as usize];
+                self.pc += 2;   
+            }
+            0x0003 => {
+                self.reg[self.inst.x as usize] ^= self.reg[self.inst.y as usize];
+                self.pc += 2;   
+            }
+            0x0004 => {
+                let (res, overflow) = self.reg[self.inst.x as usize].overflowing_add(self.reg[self.inst.y as usize]);
+                self.reg[self.inst.x as usize] = res;
+                if overflow {
+                    self.reg[15] = 1;
+                } else {
+                    self.reg[15] = 0;
+                }
+                self.pc += 2;   
+            }
+            0x0005 => {
+                let (res, overflow) = self.reg[self.inst.x as usize].overflowing_sub(self.reg[self.inst.y as usize]);
+                if overflow {
+                    self.reg[15] = 1;
+                } else {
+                    self.reg[15] = 0;
+                }
+                self.reg[self.inst.x as usize] = res;
+                self.pc += 2;   
+            }
+            0x0006 => {
+                self.reg[15] = self.reg[self.inst.x as usize] & 0x1;
+                self.reg[self.inst.x as usize] >>= 1;
+                self.pc += 2;   
+            }
+            0x0007 => {
+                let (res, overflow) = self.reg[self.inst.y as usize].overflowing_sub(self.reg[self.inst.x as usize]);
+                if overflow {
+                    self.reg[15] = 0;
+                } else {
+                    self.reg[15] = 1;
+                }
+                self.reg[self.inst.x as usize] = res;
+                self.pc += 2;   
+            }
+            0x000e => {
+                self.reg[15] = self.reg[self.inst.x as usize] >> 7;
+                self.reg[self.inst.x as usize] <<= 1;
+                self.pc += 2;
+            }
+            _ => {
+                println!()
+            }
+
+        }
     }
 
     fn skip_if_reg_v_x_eq(&mut self) {
-        if self.registers[self.instruction.y as usize] == self.registers[self.instruction.x as usize] {
+        if self.reg[self.inst.y as usize] == self.reg[self.inst.x as usize] {
             self.pc += 4;   
         } else {
             self.pc += 2;   
@@ -199,7 +319,7 @@ impl Chip8 {
     }
 
     fn skip_if_reg_neq(&mut self) {
-        if self.registers[self.instruction.x as usize] == self.instruction.nn {
+        if self.reg[self.inst.x as usize] == self.inst.nn {
             self.pc += 2;   
         } else {
             self.pc += 4;   
@@ -207,7 +327,7 @@ impl Chip8 {
     }
 
     fn skip_if_reg_eq(&mut self) {
-        if self.registers[self.instruction.x as usize] == self.instruction.nn {
+        if self.reg[self.inst.x as usize] == self.inst.nn {
             self.pc += 4;   
         } else {
             self.pc += 2;   
@@ -215,7 +335,6 @@ impl Chip8 {
     }
 
     fn op_clear_screen(&mut self) {
-        println!("Clear Screen");
         for i in self.graphics.iter_mut() {
             *i = false;
         }
@@ -229,49 +348,40 @@ impl Chip8 {
     }
 
     fn op_jump_addr(&mut self) {
-        println!("Jump Address");
-        self.pc = self.instruction.nnn;
+        self.pc = self.inst.nnn;
     }
 
     fn op_set_reg(&mut self) {
-        println!(
-            "Set Reg {:#x} as {:#x}",
-            self.instruction.x, self.instruction.nn
-        );
-        self.registers[self.instruction.x as usize] = self.instruction.nn;
+        self.reg[self.inst.x as usize] = self.inst.nn;
         self.pc += 2
     }
 
     // wasn't adding this correctly due to overflow'
     fn op_add(&mut self) {
-        println!("Add");
         let (res, overflow) =
-            self.registers[self.instruction.x as usize].overflowing_add(self.instruction.w2);
+            self.reg[self.inst.x as usize].overflowing_add(self.inst.w2);
         if overflow {
             // do something
         }
-        self.registers[self.instruction.x as usize] = res;
+        self.reg[self.inst.x as usize] = res;
         self.pc += 2;
     }
 
     fn op_set_i_reg(&mut self) {
-        println!("Set I Reg to {:#x}", self.instruction.nnn);
-        self.i = self.instruction.nnn;
-        println!("IIII: {:#x}", self.i);
+        println!("Set I to {:#x}", self.inst.nnn);
+        self.i = self.inst.nnn;
         self.pc += 2
     }
     fn op_draw(&mut self) {
-        println!("Draw");
 
-        self.registers[15] = 0;
+        self.reg[15] = 0;
 
-        let x_coord = self.registers[self.instruction.x as usize];
-        let y_coord = self.registers[self.instruction.y as usize];
+        let x_coord = self.reg[self.inst.x as usize];
+        let y_coord = self.reg[self.inst.y as usize];
         let mut flipped = false;
 
-        for y_line in 0..self.instruction.n {
+        for y_line in 0..self.inst.n {
             let sprite = self.memory[(self.i + y_line as u16) as usize];
-            println!("I: {:#x} Sprite: {:#x}", self.i + y_line as u16, sprite);
             for x_line in 0..8 {
                 let bit_on = sprite & (0b1000_0000 >> x_line);
                 if bit_on != 0 {
@@ -284,9 +394,9 @@ impl Chip8 {
             }
         }
         if flipped {
-            self.registers[0xF] = 1;
+            self.reg[0xF] = 1;
         } else {
-            self.registers[0xF] = 0;
+            self.reg[0xF] = 0;
         }
         self.pc += 2;
     }
