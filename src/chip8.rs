@@ -140,6 +140,7 @@ impl Chip8 {
                 let kk = (self.inst.opcode & 0x00FF) as u8;
                 let mut rng = rand::thread_rng();
                 self.reg[self.inst.x as usize] = rng.gen::<u8>() & kk;
+                self.pc += 2;   
             }
             0xE0 => {
                 match self.inst.w2 { //TODO: this could be wrong
