@@ -49,7 +49,8 @@ impl Plugin for Container {
         }
 
         if let Event::KeyDown{ .. } = event {
-            let key = app.keyboard.last_key_released.ok_or("No key pressed")?;
+            let key = app.keyboard.down.iter().nth(0).map(|(k, _)| k).ok_or("No key found")?;
+            //let key = app.keyboard.pressed.iter().nth(0).unwrap();
             let k = match key {
                 KeyCode::Key1 => 0x1,
                 KeyCode::Key2 => 0x2,
@@ -101,7 +102,7 @@ impl Plugin for Container {
             }
         }
         gfx.render(&draw);
-        let ten_millis = time::Duration::from_millis(100);
+        let ten_millis = time::Duration::from_millis(10);
         //thread::sleep(ten_millis);
         Ok(notan::app::AppFlow::Next)
     }

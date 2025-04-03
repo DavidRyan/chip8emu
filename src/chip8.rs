@@ -39,7 +39,7 @@ struct Instruction {
 
 impl Instruction {
     fn read(&mut self, w1: u8, w2: u8) {
-        println!("Read {:#x} {:#x}", w1, w2);
+        //println!("Read {:#x} {:#x}", w1, w2);
         self.opcode = ((w1 as u16) << 8) | (w2 as u16);
         self.inst = w1 & 0xf0;
         self.x = w1 & 0x0f;
@@ -178,27 +178,36 @@ impl Chip8 {
                         self.pc += 2;
                     },
                     0x0A => {
+                        if let Some(k) = self.keys.iter().position(|x| *x == true){
+                            self.keys[k] = false;
+                            self.reg[self.inst.x as usize] = k as u8;
+                            self.pc += 2;
+                        }           
+                    }
+                    0x099 => {
                         let mut key_pressed = false;
                         for i in 0..16 {
                             if self.keys[i] {
+                                println!("----Setting pressed {:#x}", i);
                                 self.reg[self.inst.x as usize] = i as u8;
                                 key_pressed = true;
                             }
                         }
+                        println!("Waiting for key press");
                         if !key_pressed {
                             return;
                         }
                         self.pc += 2;
                     },
-                    0x0015 => {
+                    0x15 => {
                         self.delay_timer = self.reg[self.inst.x as usize];
                         self.pc += 2;
                     }
-                    0x0018 => {
+                    0x18 => {
                         self.sound_timer = self.reg[self.inst.x as usize];
                         self.pc += 2;
                     }
-                    0x001E => {
+                    0x1E => {
                         let (res, overflow) = self.i.overflowing_add(self.reg[self.inst.x as usize] as u16);
                         self.i = res;
                         if overflow {
@@ -208,12 +217,12 @@ impl Chip8 {
                         }
                         self.pc += 2;
                     }
-                    0x029 => {
+                    0x29 => {
                         self.i = self.reg[self.inst.x as usize] as u16 * 5;
                         self.pc += 2;
                     }
                     // below all wrong
-                    0x0033 => {
+                    0x33 => {
                         let x = ((self.inst.opcode & 0x0F00) >> 8) as usize;
                         let vx = self.reg[x];
 
@@ -222,19 +231,19 @@ impl Chip8 {
                         self.memory[(self.i + 2) as usize] = vx % 10;
                         self.pc += 2;
                     }
-                    0x0055 => {
+                    0x55 => {
                         let x = self.inst.x;
                         for index in 0..=x as usize {
                             self.memory[self.i as usize + index] = self.reg[index];
                         }
                         self.pc += 2;        
                     }
-                    0x0065 => {
-                        //TODO: is this wrong?
-
-                        let x = self.inst.x;
-                        for i in 0..=x as usize {
-                            self.reg[i] = self.memory[(self.i as usize) + i];
+                    0x65 => {
+                        let x = ((self.inst.opcode >> 8) & 0xF) as usize;
+                        let mut tmp = self.i as usize;
+                        for i in 0..= x {
+                            self.reg[i] = self.memory[tmp];
+                            tmp += 1;
                         }
                         self.pc += 2;
                     }
