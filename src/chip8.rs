@@ -39,6 +39,7 @@ struct Instruction {
 
 impl Instruction {
     fn read(&mut self, w1: u8, w2: u8) {
+        println!("Read {:#x} {:#x}", w1, w2);
         self.opcode = ((w1 as u16) << 8) | (w2 as u16);
         self.inst = w1 & 0xf0;
         self.x = w1 & 0x0f;
@@ -52,6 +53,27 @@ impl Instruction {
 }
 
 impl Chip8 {
+    pub fn key_down(&mut self, key: u8) {
+        println!("Key down {:#x}", key);
+        self.keys[key as usize] = true;
+        println!("Key {}", self.keys[key as usize]);
+    }
+    pub fn key_up(&mut self, key: u8) {
+        println!("Key up {:#x}", key);
+        self.keys[key as usize] = false;
+    }
+    pub fn tick_timers(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+
+        if self.sound_timer > 0 {
+            if self.sound_timer== 1 {
+                //sound not implemented
+            }
+            self.sound_timer -= 1;
+        }
+    }
     pub fn new() -> Chip8 {
         let mut mem = [0_u8; 4096];
         mem[..80].copy_from_slice(&SPRITE_CHARS);
@@ -91,13 +113,13 @@ impl Chip8 {
                 0xee => self.op_return(),
                 _ => println!("No inst found for {:#x}", self.inst.w1),
             },
-            0x10 => self.op_jump_addr(),
+            0x10 => self.op_jump_addr(), //TODO: THIS COULD
             0x20 => {
                 self.stack[self.sp as usize] = self.pc;
                 self.sp += 1;
                 self.pc = self.inst.nnn;
             }
-            0x30 => self.skip_if_reg_eq(),
+            0x30 => self.skip_if_reg_eq(), //TODO: THis could be wrong
             0x40 => self.skip_if_reg_neq(),
             0x50 => self.skip_if_reg_v_x_eq(),
             0x60 => self.op_set_reg(),
@@ -115,10 +137,21 @@ impl Chip8 {
                 self.pc = self.inst.nnn + self.reg[0] as u16;
             },
             0xC0 => {
-                self.reg[self.inst.x as usize] = rand::rng().random_range(0..255) & self.inst.nn;
+                let kk = (self.inst.opcode & 0x00FF) as u8;
+                let mut rng = rand::thread_rng();
+                self.reg[self.inst.x as usize] = rng.gen::<u8>() & kk;
             }
             0xE0 => {
                 match self.inst.w2 { //TODO: this could be wrong
+                    0x9e => {
+                        println!("Checking key {:#x}", self.reg[self.inst.x as usize]);
+                        let x = self.inst.x as usize;
+                        if self.keys[self.reg[x] as usize] {
+                            self.pc += 4;
+                        } else {
+                            self.pc += 2;
+                        }
+                    }
                     0x90 => {
                         if self.keys[self.reg[self.inst.x as usize] as usize] {
                             self.pc += 4;
@@ -134,7 +167,7 @@ impl Chip8 {
                         }
                     },
                     _ => {
-                        println!("No inst found for {:#x}", self.inst.w1)
+                        println!("No HERE inst found for {:#x}", self.inst.w2)
                     }
                 }
             }
@@ -197,6 +230,8 @@ impl Chip8 {
                         self.pc += 2;        
                     }
                     0x0065 => {
+                        //TODO: is this wrong?
+
                         let x = self.inst.x;
                         for i in 0..=x as usize {
                             self.reg[i] = self.memory[(self.i as usize) + i];
@@ -212,17 +247,6 @@ impl Chip8 {
             _ => {
                 println!("No inst found for {:#x}", self.inst.w1)
             }
-        }
-        if self.delay_timer > 0 {
-            self.delay_timer -= 1;
-        }
-
-        if self.sound_timer > 0 {
-
-            if self.sound_timer == 1 {
-                // TODO: Implement sound
-            }
-            self.sound_timer -= 1;
         }
     }
 
@@ -333,7 +357,7 @@ impl Chip8 {
     }
 
     fn op_jump_addr(&mut self) {
-        self.pc = self.inst.nnn;
+        self.pc = self.inst.opcode & 0x0FFF;
     }
 
     fn op_set_reg(&mut self) {

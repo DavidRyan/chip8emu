@@ -1,5 +1,5 @@
 use crate::chip8::Chip8;
-//use std::{thread, time};
+use std::{thread, time};
 
 use notan::app::{AppFlow, Event, Plugin};
 use notan::draw::*;
@@ -25,12 +25,58 @@ impl Plugin for Container {
         event: &Event,
     ) -> Result<AppFlow, String> {
         if let Event::KeyUp { .. } = event {
-            println!("Key down {:?}", app.keyboard.last_key_released);
+            let key = app.keyboard.last_key_released.ok_or("No key pressed")?;
+            let k = match key {
+                KeyCode::Key1=> 0x1,
+                KeyCode::Key2 => 0x2,
+                KeyCode::Key3 => 0x3,
+                KeyCode::Key4 => 0xC,
+                KeyCode::Q => 0x4,
+                KeyCode::W => 0x5,
+                KeyCode::E => 0x6,
+                KeyCode::R => 0xD,
+                KeyCode::A => 0x7,
+                KeyCode::S => 0x8,
+                KeyCode::D => 0x9,
+                KeyCode::F => 0xE,
+                KeyCode::Z => 0xA,
+                KeyCode::X => 0x0,
+                KeyCode::C => 0xB,
+                KeyCode::V => 0xF,
+                _ => (0x0),
+            };
+            self.c8.key_up(k);
         }
+
+        if let Event::KeyDown{ .. } = event {
+            let key = app.keyboard.last_key_released.ok_or("No key pressed")?;
+            let k = match key {
+                KeyCode::Key1 => 0x1,
+                KeyCode::Key2 => 0x2,
+                KeyCode::Key3 => 0x3,
+                KeyCode::Key4 => 0xC,
+                KeyCode::Q => 0x4,
+                KeyCode::W => 0x5,
+                KeyCode::E => 0x6,
+                KeyCode::R => 0xD,
+                KeyCode::A => 0x7,
+                KeyCode::S => 0x8,
+                KeyCode::D => 0x9,
+                KeyCode::F => 0xE,
+                KeyCode::Z => 0xA,
+                KeyCode::X => 0x0,
+                KeyCode::C => 0xB,
+                KeyCode::V => 0xF,
+                _ => (0x0),
+            };
+            self.c8.key_down(k);
+        }
+
         Ok(notan::app::AppFlow::Next)
     }
 
     fn update(&mut self, _app: &mut App, _assets: &mut Assets) -> Result<AppFlow, String> {
+        self.c8.tick_timers();
         self.c8.execute();
         Ok(notan::app::AppFlow::Next)
     }
@@ -55,8 +101,7 @@ impl Plugin for Container {
             }
         }
         gfx.render(&draw);
-
-        //let ten_millis = time::Duration::from_millis(100);
+        let ten_millis = time::Duration::from_millis(100);
         //thread::sleep(ten_millis);
         Ok(notan::app::AppFlow::Next)
     }
