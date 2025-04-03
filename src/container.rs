@@ -95,9 +95,9 @@ impl Plugin for Container {
             for y in 0..31 {
                 let i = y * 64 + x;
                 if self.c8.graphics[i] {
-                    let n_x = x * 10;
-                    let n_y = y * 10;
-                    draw.rect((n_x as f32, n_y as f32), (10.0, 10.0));
+                    let n_x = x * 20;
+                    let n_y = y * 20;
+                    draw.rect((n_x as f32, n_y as f32), (20.0, 20.0));
                 }
             }
         }

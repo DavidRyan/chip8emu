@@ -16,7 +16,7 @@ fn main() {
     let file_path = &args[1];
     let rom = fs::read(file_path).unwrap();
 
-    let win_config = WindowConfig::new().set_size(1200, 640).set_vsync(true);
+    let win_config = WindowConfig::new().set_size(640, 320).set_vsync(true);
     let _ = notan::init()
         .add_plugin(Container::new(rom))
         .add_config(DrawConfig)
