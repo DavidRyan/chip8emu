@@ -404,6 +404,9 @@ impl Chip8 {
             for x_line in 0..8 {
                 let bit_on = sprite & (0b1000_0000 >> x_line);
                 if bit_on != 0 {
+                    if (x_coord >= SCREEN_WIDTH as u8) || (y_coord >= SCREEN_HEIGHT as u8) {
+                        continue;
+                    }
                     let x = (x_coord + x_line) as usize % SCREEN_WIDTH;
                     let y = (y_coord + y_line) as usize % SCREEN_HEIGHT;
                     let idx = y * SCREEN_WIDTH + x;
