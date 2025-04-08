@@ -275,86 +275,84 @@ impl Chip8 {
                     }
                 }
             }
-            0xF0 => {
-                match self.inst.w2 {
-                    0x07 => {
-                        self.reg[self.inst.x as usize] = self.delay_timer;
+            0xF0 => match self.inst.w2 {
+                0x07 => {
+                    self.reg[self.inst.x as usize] = self.delay_timer;
+                    self.pc += 2;
+                }
+                0x0A => {
+                    if let Some(k) = self.keys.iter().position(|x| *x == true) {
+                        self.keys[k] = false;
+                        self.reg[self.inst.x as usize] = k as u8;
                         self.pc += 2;
-                    }
-                    0x0A => {
-                        if let Some(k) = self.keys.iter().position(|x| *x == true) {
-                            self.keys[k] = false;
-                            self.reg[self.inst.x as usize] = k as u8;
-                            self.pc += 2;
-                        }
-                    }
-                    0x099 => {
-                        let mut key_pressed = false;
-                        for i in 0..16 {
-                            if self.keys[i] {
-                                self.reg[self.inst.x as usize] = i as u8;
-                                key_pressed = true;
-                            }
-                        }
-                        if !key_pressed {
-                            return;
-                        }
-                        self.pc += 2;
-                    }
-                    0x15 => {
-                        self.delay_timer = self.reg[self.inst.x as usize];
-                        self.pc += 2;
-                    }
-                    0x18 => {
-                        self.sound_timer = self.reg[self.inst.x as usize];
-                        self.pc += 2;
-                    }
-                    0x1E => {
-                        let (res, overflow) = self
-                            .i
-                            .overflowing_add(self.reg[self.inst.x as usize] as u16);
-                        self.i = res;
-                        if overflow {
-                            self.reg[15] = 1;
-                        } else {
-                            self.reg[15] = 0;
-                        }
-                        self.pc += 2;
-                    }
-                    0x29 => {
-                        self.i = self.reg[self.inst.x as usize] as u16 * 5;
-                        self.pc += 2;
-                    }
-                    0x33 => {
-                        let x = ((self.inst.opcode & 0x0F00) >> 8) as usize;
-                        let vx = self.reg[x];
-
-                        self.memory[self.i as usize] = vx / 100;
-                        self.memory[(self.i + 1) as usize] = (vx % 100) / 10;
-                        self.memory[(self.i + 2) as usize] = vx % 10;
-                        self.pc += 2;
-                    }
-                    0x55 => {
-                        let x = self.inst.x;
-                        for index in 0..=x as usize {
-                            self.memory[self.i as usize + index] = self.reg[index];
-                        }
-                        self.pc += 2;
-                    }
-                    0x65 => {
-                        let x = ((self.inst.opcode >> 8) & 0xF) as usize;
-                        let mut tmp = self.i as usize;
-                        for i in 0..=x {
-                            self.reg[i] = self.memory[tmp];
-                            tmp += 1;
-                        }
-                        self.pc += 2;
-                    }
-                    _ => {
-                        println!("No inst found for {:#x}", self.inst.w1)
                     }
                 }
-            }
+                0x099 => {
+                    let mut key_pressed = false;
+                    for i in 0..16 {
+                        if self.keys[i] {
+                            self.reg[self.inst.x as usize] = i as u8;
+                            key_pressed = true;
+                        }
+                    }
+                    if !key_pressed {
+                        return;
+                    }
+                    self.pc += 2;
+                }
+                0x15 => {
+                    self.delay_timer = self.reg[self.inst.x as usize];
+                    self.pc += 2;
+                }
+                0x18 => {
+                    self.sound_timer = self.reg[self.inst.x as usize];
+                    self.pc += 2;
+                }
+                0x1E => {
+                    let (res, overflow) = self
+                        .i
+                        .overflowing_add(self.reg[self.inst.x as usize] as u16);
+                    self.i = res;
+                    if overflow {
+                        self.reg[15] = 1;
+                    } else {
+                        self.reg[15] = 0;
+                    }
+                    self.pc += 2;
+                }
+                0x29 => {
+                    self.i = self.reg[self.inst.x as usize] as u16 * 5;
+                    self.pc += 2;
+                }
+                0x33 => {
+                    let x = ((self.inst.opcode & 0x0F00) >> 8) as usize;
+                    let vx = self.reg[x];
+
+                    self.memory[self.i as usize] = vx / 100;
+                    self.memory[(self.i + 1) as usize] = (vx % 100) / 10;
+                    self.memory[(self.i + 2) as usize] = vx % 10;
+                    self.pc += 2;
+                }
+                0x55 => {
+                    let x = self.inst.x;
+                    for index in 0..=x as usize {
+                        self.memory[self.i as usize + index] = self.reg[index];
+                    }
+                    self.pc += 2;
+                }
+                0x65 => {
+                    let x = ((self.inst.opcode >> 8) & 0xF) as usize;
+                    let mut tmp = self.i as usize;
+                    for i in 0..=x {
+                        self.reg[i] = self.memory[tmp];
+                        tmp += 1;
+                    }
+                    self.pc += 2;
+                }
+                _ => {
+                    println!("No inst found for {:#x}", self.inst.w1)
+                }
+            },
             0xD0 => {
                 self.reg[15] = 0;
 

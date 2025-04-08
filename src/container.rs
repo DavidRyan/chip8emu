@@ -18,6 +18,8 @@ impl Container {
 }
 
 impl Plugin for Container {
+    // TODO: improve key handling by getting state of keyboard and
+    // passing it to the chip8
     fn event(
         &mut self,
         app: &mut App,
@@ -43,7 +45,7 @@ impl Plugin for Container {
                 KeyCode::X => 0x0,
                 KeyCode::C => 0xB,
                 KeyCode::V => 0xF,
-                _ => (0x0),
+                _ => 0x0,
             };
             self.c8.key_up(k);
         }
@@ -73,7 +75,7 @@ impl Plugin for Container {
                 KeyCode::X => 0x0,
                 KeyCode::C => 0xB,
                 KeyCode::V => 0xF,
-                _ => (0x0),
+                _ => 0x0,
             };
             self.c8.key_down(k);
         }
