@@ -27,7 +27,7 @@ impl Plugin for Container {
         if let Event::KeyUp { .. } = event {
             let key = app.keyboard.last_key_released.ok_or("No key pressed")?;
             let k = match key {
-                KeyCode::Key1=> 0x1,
+                KeyCode::Key1 => 0x1,
                 KeyCode::Key2 => 0x2,
                 KeyCode::Key3 => 0x3,
                 KeyCode::Key4 => 0xC,
@@ -48,9 +48,14 @@ impl Plugin for Container {
             self.c8.key_up(k);
         }
 
-        if let Event::KeyDown{ .. } = event {
-            let key = app.keyboard.down.iter().nth(0).map(|(k, _)| k).ok_or("No key found")?;
-            //let key = app.keyboard.pressed.iter().nth(0).unwrap();
+        if let Event::KeyDown { .. } = event {
+            let key = app
+                .keyboard
+                .down
+                .iter()
+                .nth(0)
+                .map(|(k, _)| k)
+                .ok_or("No key found")?;
             let k = match key {
                 KeyCode::Key1 => 0x1,
                 KeyCode::Key2 => 0x2,
@@ -102,8 +107,6 @@ impl Plugin for Container {
             }
         }
         gfx.render(&draw);
-        let ten_millis = time::Duration::from_millis(10);
-        //thread::sleep(ten_millis);
         Ok(notan::app::AppFlow::Next)
     }
 }

@@ -9,8 +9,6 @@ use std::fs;
 use notan::draw::*;
 use notan::prelude::*;
 
-
-
 fn main() {
     let args: Vec<String> = env::args().collect();
     let file_path = &args[1];
@@ -23,6 +21,3 @@ fn main() {
         .add_config(win_config)
         .build();
 }
-
-
-
